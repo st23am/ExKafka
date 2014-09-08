@@ -1,5 +1,7 @@
 defmodule Kafka.ProducerSupervisor do
   use Supervisor
+  @host Application.get_env(:producer, :host)
+  @port Application.get_env(:producer, :port)
 
   def init(arg) do
     children = [
@@ -10,6 +12,11 @@ defmodule Kafka.ProducerSupervisor do
   end
 
   def start_link() do
-    Supervisor.start_link(__MODULE__, :ok)
+    Supervisor.start_link(__MODULE__, :ok, name: ProducerSupervisor)
+  end
+
+  def connect do
+    Supervisor.start_child(ProducerSupervisor, [@host, @port])
   end
 end
+

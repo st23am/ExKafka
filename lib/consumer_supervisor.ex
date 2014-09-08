@@ -1,6 +1,9 @@
 defmodule Kafka.ConsumerSupervisor do
   use Supervisor
 
+  @host Application.get_env(:consumer, :host)
+  @port Application.get_env(:consumer, :port)
+
   def init(arg) do
     children = [
       worker(Kafka.Consumer, [], restart: :temporary)
@@ -9,10 +12,10 @@ defmodule Kafka.ConsumerSupervisor do
   end
 
   def start_link() do
-    Supervisor.start_link(__MODULE__, :ok)
+    Supervisor.start_link(__MODULE__, :ok, name: ConsumerSupervisor)
   end
 
-  def connect(host, port) do
-    :gen_tcp.connect(host, port, [:binary, {:packet, 0}])
+  def connect do
+    Supervisor.start_child(ConsumerSupervisor, [@host, @port])
   end
 end
