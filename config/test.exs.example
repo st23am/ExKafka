@@ -1,0 +1,10 @@
+use Mix.Config
+
+config :producer,
+  host: "localhost",
+  port: "foo"
+
+config :consumer,
+  host: "localhost",
+  port: 2181
+
