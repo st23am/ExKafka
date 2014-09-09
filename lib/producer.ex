@@ -14,7 +14,6 @@ defmodule Kafka.Producer do
   end
 
   def handle_call({:send_kafka_message, message}, _from, socket) do
-    #TODO: create properly format/encode message for kafka
     :gen_tcp.send(socket, message)
     {status, data} = :gen_tcp.recv(socket, 0)
     {:reply, {status, data}, socket}
