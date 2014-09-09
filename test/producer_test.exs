@@ -6,6 +6,7 @@ defmodule ProducerTest do
   end
 
   test "putting something into kafka" do
-
+    {:ok, pid} = Kafka.Producer.start_link('localhost', 9092)
+    assert {:ok, _acknowledgement} = Kafka.Producer.send_kafka_messsage(pid, "a message")
   end
 end
