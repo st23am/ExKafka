@@ -2,7 +2,7 @@ defmodule Kafka.Producer do
   use GenServer
 
   def init([host, port]) do
-    {:ok, _socket} = :gen_tcp.connect(host, port, [:binary, {:packet, 0}])
+    {:ok, _socket} = :gen_tcp.connect(host, port, [:binary, {:packet, 0}, {:active, false}])
   end
 
   def start_link(host, port) do
@@ -14,8 +14,8 @@ defmodule Kafka.Producer do
   end
 
   def handle_call({:send_kafka_message, message}, _from, socket) do
-    :gen_tcp.send(socket, message)
-    {status, data} = :gen_tcp.recv(socket, 0)
-    {:reply, {status, data}, socket}
+    :ok = :gen_tcp.send(socket, message)
+    {:ok, data} = :gen_tcp.recv(socket, 0)
+    {:reply, {:ok, data}, socket}
   end
 end

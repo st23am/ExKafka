@@ -7,6 +7,7 @@ defmodule ProducerTest do
 
   test "putting something into kafka" do
     {:ok, child_pid} = Kafka.ProducerSupervisor.connect
-    assert {:ok, _data} = Kafka.Producer.send_kafka_messsage(child_pid, "a message")
+    message = KafkaProtocol.metadata_request(1, "foo",["amessage"])
+    assert {:ok, data} = Kafka.Producer.send_kafka_messsage(child_pid, message)
   end
 end
