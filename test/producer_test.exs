@@ -6,6 +6,7 @@ defmodule ProducerTest do
   end
 
   test "putting something into kafka" do
-
+    {:ok, child_pid} = Kafka.ProducerSupervisor.connect
+    assert {:ok, _data} = Kafka.Producer.send_kafka_messsage(child_pid, "a message")
   end
 end

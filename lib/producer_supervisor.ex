@@ -3,7 +3,7 @@ defmodule Kafka.ProducerSupervisor do
   @host Application.get_env(:producer, :host)
   @port Application.get_env(:producer, :port)
 
-  def init(arg) do
+  def init(_arg) do
     children = [
       worker(Kafka.Producer, [], restart: :temporary)
     ]
