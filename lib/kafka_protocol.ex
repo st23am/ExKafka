@@ -15,7 +15,7 @@
 ##%-------------------------------------------------------------------
 defmodule KafkaProtocol do
 
-  import ErlKafka
+  import ExKafka.Constants
 
   ## Initial philosophy is derived from
   ##     https://github.com/wooga/kafka-erlang.git
@@ -53,7 +53,7 @@ defmodule KafkaProtocol do
 
   @spec metadata_request(integer,binary,list(binary)) :: binary
   def metadata_request(correlation_id, client_id, topics) do
-    common_part = common_part_of_request(ErlKafka.rq_metadata, ErlKafka.api_v_metadata, correlation_id, client_id)
+    common_part = common_part_of_request(rq_metadata, api_v_metadata, correlation_id, client_id)
     #:io.format("COMMON PART ~p~n", [common_part])
     topic_count = length(topics)
 
@@ -138,7 +138,7 @@ defmodule KafkaProtocol do
   #                    TimeOut
   #                  ) ->
   #
-  #      CommonPartOfRequest = common_part_of_request(?RQ_PRODUCE,
+  #      CommonPartOfRequest = common_part_of_request(ExKafka.Constants.RQ_PRODUCE,
   #                                                    ?API_V_PRODUCE,
   #                                                    CorrelationId,
   #                                                    ClientId),
@@ -201,7 +201,7 @@ defmodule KafkaProtocol do
   #                            [<<TopicNameBin/binary, PartitionBin/binary>> | List]
   #                           end, [], TopicList),
   #          FetchTopicBin = create_array_binary(FetchTopicList),
-  #          CommonPartofRequest = common_part_of_request(?RQ_FETCH, ?API_V_FETCH, CorrelationId, ClientId),
+  #          CommonPartofRequest = common_part_of_request(ExKafka.Constants.RQ_FETCH, ?API_V_FETCH, CorrelationId, ClientId),
   #          FetchRequest = <<CommonPartofRequest/binary, ?REPLICA_ID:32/signed-integer, MaxWaitTime:32/integer, MinBytes:32/integer, FetchTopicBin/binary>>,
   #          FetchRequestSize = size(FetchRequest),
   #          <<FetchRequestSize:32/integer, FetchRequest/binary>>.
@@ -262,7 +262,7 @@ defmodule KafkaProtocol do
   #                    Topics
   #                  ) ->
   #
-  #      CommonPartOfRequest = common_part_of_request(?RQ_OFFSET,
+  #      CommonPartOfRequest = common_part_of_request(ExKafka.Constants.RQ_OFFSET,
   #                                                   ?API_V_OFFSET,
   #                                                   CorrelationId,
   #                                                   ClientId),
@@ -299,40 +299,44 @@ defmodule KafkaProtocol do
   #  ## parse_response_stream should return length consumed & a list of  correlationids and the specific response parsed
   #  ## WHERE POSSIBLE
   #  ##
-  parse_response_stream(Data) ->
-  #  %    io:format("Parse this data stream ~p~n", [Data]),
-  #       parse_response_stream(Data, 0, []).
+  def parse_response_stream(data) do
+    parse_response_stream(data, 0, [])
+  end
+
+  def parse_response_stream(<<>>, length_consumed, list_of_responses) do
+    { length_consumed, list_of_responses }
+  end
+  
+  def parse_response_stream(<<response_size :: size(32), corr_id :: size(32), rest :: binary>> = _data, length_consumed, list_of_responses) when :erlang.size(rest) >= response_size - 4 do
+    #  %    io:format("Correlation Id ~w~n", [CorrId]),
+    { request_type, response_fun } = get_response_type_n_fun_from_corrid(corr_id)
+    response_size_without_correlation_id = response_size - 4
+
+    <<response_data :: binary-size(response_size_without_correlation_id), rest_of_rest :: binary>> = rest
+    response_fun_return = response_fun.(response_data)
+    parse_response_stream(rest_of_rest, length_consumed + 4 + response_size, [ {corr_id, request_type, response_fun_return} |  list_of_responses ])
+  end
+
+  def parse_response_stream(_data, length_consumed, list_of_responses) do
+    { length_consumed, list_of_responses }
+  end
+
+  def get_response_type_n_fun_from_corrid(corr_id) when ((corr_id >= startmd) and (corr_id <= endmd)) do
+    {ExKafka.Constants.rq_metadata, &metadata_response/1}
+  end
+
+  #  def get_response_type_n_fun_from_corrid(corr_id) when  ((corr_id >= ExKafka.Constants.startpr) and (corr_id =< ex_kafka.Constants.endpr)) do
+  #    {ExKafka.Constants.rq_produce, &produce_response/1}
+  #  end
   #
-  #  parse_response_stream(<<>>, LengthConsumed, ListOfResponses)  ->
-  #      {LengthConsumed, ListOfResponses };
-  #
-  #  parse_response_stream (<<ResponseSize:32/integer, CorrId:32/integer, Rest/binary>> = _Data, LengthConsumed, ListOfResponses) when size(Rest) >= ResponseSize - 4 ->
-  #  %    io:format("Correlation Id ~w~n", [CorrId]),
-  #      {RequestType, ResponseFun} = get_response_type_n_fun_from_corrid(CorrId),
-  #
-  #      ResponseSizeWOCI = ResponseSize - 4,
-  #
-  #      <<ResponseData:ResponseSizeWOCI/binary, RestOfRest/binary>> = Rest,
-  #      ResponseFunReturn = ResponseFun(ResponseData),
-  #      parse_response_stream (RestOfRest, LengthConsumed + 4 + ResponseSize, [ {CorrId, RequestType, ResponseFunReturn} |  ListOfResponses]);
-  #
-  #
-  #  parse_response_stream (_Data, LengthConsumed, ListOfResponses) ->
-  #
-  #      {LengthConsumed, ListOfResponses }.
-  #
-  #
-  #  get_response_type_n_fun_from_corrid(CorrId) when  ((CorrId >= ?STARTMD) and (CorrId =< ?ENDMD)) ->
-  #      {?RQ_METADATA, fun metadata_response/1};
-  #
-  #  get_response_type_n_fun_from_corrid(CorrId) when  ((CorrId >= ?STARTPR) and (CorrId =< ?ENDPR)) ->
-  #      {?RQ_PRODUCE, fun produce_response/1};
-  #
-  #  get_response_type_n_fun_from_corrid(CorrId) when  ((CorrId >= ?STARTFE) and (CorrId =< ?ENDFE)) ->
-  #      {?RQ_FETCH, fun fetch_response/1};
-  #
-  #  get_response_type_n_fun_from_corrid(CorrId) when  CorrId == 0 ->
-  #      {?RQ_OFFSET, fun offset_response/1}.
+  #  def get_response_type_n_fun_from_corrid(corr_id) when  ((corr_id >= ExKafka.Constants.startfe) and (corr_id =< ExKafka.Constants.endfe)) do
+  #    {ExKafka.Constants.rq_fetch, &fetch_response/1}
+  #  end
+  #  
+  #  def get_response_type_n_fun_from_corrid(corr_id) when  corr_id == 0 do
+  #    {ExKafka.Constants.rq_offset, &offset_response/1}
+  #  end
+
   #
   #
   #
