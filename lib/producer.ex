@@ -9,8 +9,16 @@ defmodule Kafka.Producer do
     GenServer.start_link(__MODULE__, [host, port])
   end
 
-  def send_kafka_messsage(pid, message) do
+  def send_kafka_message(pid, message) do
     GenServer.call(pid, {:send_kafka_message, message})
+  end
+
+  @spec metadata(pid, integer, binary, list(binary)) :: tuple(list(tuple)) 
+  def metadata(producer_pid, correlation_id, client_id, topics) do
+    message = KafkaProtocol.metadata_request(correlation_id, client_id, topics)
+    { :ok, response_data } = send_kafka_message(producer_pid, message)
+    { _, [ {correlation_id, _, response } ] } = KafkaProtocol.parse_response_stream(response_data)
+    response
   end
 
   def handle_call({:send_kafka_message, message}, _from, socket) do
